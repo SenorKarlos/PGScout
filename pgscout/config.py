@@ -54,6 +54,9 @@ def parse_args():
     parser.add_argument('-l', '--level', type=int, default=30,
                         help='Minimum trainer level required. Lower levels will yield an error.')
 
+    parser.add_argument('-pgpmult', '--pgpool-acct-multiplier', type=int, default=1,
+                        help='Use each account fetched from PGPOOL this number of times')
+
     parser.add_argument('-mqj', '--max-queued-jobs', type=int, default=0,
                         help='Maximum number of queued scout jobs before rejecting new jobs. 0 (default) means no restriction.')
 
@@ -153,6 +156,25 @@ def cfg_init():
         'pgpool_system_id': args.pgpool_system_id,
         'exception_on_captcha': True
     }
+
+    if args.pgpool_acct_multiplier > 1:
+        mrmime_cfg.update ({
+            'parallel_logins': False,
+            'request_retry_delay': 1,
+            'download_assets_and_items': False,
+            'full_login_flow': False,
+            'scan_delay' : 5
+        })
+
+    if args.pgpool_acct_multiplier > 1:
+        mrmime_cfg.update ({
+            'parallel_logins': False,
+            'request_retry_delay': 1,
+            'download_assets_and_items': False,
+            'full_login_flow': False,
+            'scan_delay' : 5
+        })
+
     if args.pgpool_url:
         mrmime_cfg['pgpool_url'] = args.pgpool_url
         log.info("Attaching to PGPool at {}".format(args.pgpool_url))
