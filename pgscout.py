@@ -16,6 +16,7 @@ from pgscout.config import cfg_get, cfg_init, get_pokemon_name
 from pgscout.console import print_status, hr_tstamp
 from pgscout.utils import normalize_encounter_id, \
     load_pgpool_accounts, app_state, rss_mem_size, get_pokemon_prio, PRIO_HIGH, PRIO_LOW, PRIO_NAMES
+import pgscout.Scout
 
 logging.basicConfig(level=logging.INFO,
     format='%(asctime)s [%(threadName)16s][%(module)14s][%(levelname)8s] %(message)s')
@@ -28,14 +29,13 @@ logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
-scouts = []
 jobs = PriorityQueue()
 
 # ===========================================================================
 
 
 def have_active_scouts():
-    for s in scouts:
+    for s in pgscout.Scout.scouts:
         if s.active:
             return True
     return False
@@ -106,7 +106,7 @@ def status(page=1):
         return "<td>{}</td>".format(cell)
 
     max_scouts_per_page = 25
-    max_page = int(math.ceil(len(scouts)/float(max_scouts_per_page)))
+    max_page = int(math.ceil(len(pgscout.Scout.scouts)/float(max_scouts_per_page)))
     lines = "<style> th,td { padding-left: 10px; padding-right: 10px; border: 1px solid #ddd; } table { border-collapse: collapse } td { text-align:center }</style>"
     lines += "<meta http-equiv='Refresh' content='5'>"
     lines += "Accepting requests: {} | Job queue length: {} | Cached encounters: {} | Mem Usage: {}".format(
@@ -125,15 +125,15 @@ def status(page=1):
         lines += "<th>{}</th>".format(h)
     lines += "</tr>"
 
-    if page * max_scouts_per_page > len(scouts):    #Page number is too great, set to last page
+    if page * max_scouts_per_page > len(pgscout.Scout.scouts):    #Page number is too great, set to last page
         page = max_page
     if page < 1:
         page = 1
     for i in range((page-1)*max_scouts_per_page, page*max_scouts_per_page):
-        if i >= len(scouts):
+        if i >= len(pgscout.Scout.scouts):
             break
         lines += "<tr>"
-        s = scouts[i].acc
+        s = pgscout.Scout.scouts[i].acc
         warn = s.get_state('warn')
         warn_str = '' if warn is None else ('Yes' if warn else 'No')
         lines += td(i+1)
@@ -141,7 +141,7 @@ def status(page=1):
         lines += td(s.proxy_url) if cfg_get('proxies') else ""
         lines += td(hr_tstamp(s.start_time))
         lines += td(warn_str)
-        lines += td('Yes' if scouts[i].active else 'No')
+        lines += td('Yes' if pgscout.Scout.scouts[i].active else 'No')
         lines += td(s.total_encounters)
         lines += td("{:5.1f}".format(s.encounters_per_hour))
         lines += td(s.errors)
@@ -151,7 +151,7 @@ def status(page=1):
     lines += "</table>"
 
     lines += "<br>"
-    if len(scouts) > max_scouts_per_page:  # Use pages if we have more than max_scouts_per_page
+    if len(pgscout.Scout.scouts) > max_scouts_per_page:  # Use pages if we have more than max_scouts_per_page
         lines += "Page: "
         if max_page > 1 and page > 1:
             lines += "<a href={}>&lt;</a> | ".format(url_for('status', page=page-1))
@@ -190,7 +190,7 @@ def load_accounts(jobs):
             for line in f:
                 fields = line.split(",")
                 fields = map(unicode.strip, fields)
-                accounts.append(ScoutGuard(fields[0], fields[1], fields[2], jobs))
+                accounts.append(ScoutGuard(fields[0], fields[1], fields[2], jobs, 0, 0))
     elif cfg_get('pgpool_url') and cfg_get('pgpool_system_id') and cfg_get('pgpool_num_accounts') > 0:
 
         acc_json = load_pgpool_accounts(cfg_get('pgpool_num_accounts'), reuse=True)
@@ -200,7 +200,8 @@ def load_accounts(jobs):
         if len(acc_json) > 0:
             log.info("Loaded {} accounts from PGPool.".format(len(acc_json)))
             for acc in acc_json:
-                accounts.append(ScoutGuard(acc['auth_service'], acc['username'], acc['password'], jobs))
+                for x in range(0,cfg_get('pgpool_acct_multiplier')):
+                    accounts.append(ScoutGuard(acc['auth_service'], acc['username'], acc['password'], jobs, 0 if x==0 else 1, x))
 
     if len(accounts) == 0:
         log.error("Could not load any accounts. Nothing to do. Exiting.")
@@ -218,8 +219,8 @@ log.info("PGScout starting up.")
 
 cfg_init()
 
-scouts = load_accounts(jobs)
-for scout in scouts:
+pgscout.Scout.scouts = load_accounts(jobs)
+for scout in pgscout.Scout.scouts:
     t = Thread(target=scout.run)
     t.daemon = True
     t.start()
@@ -231,7 +232,7 @@ t.start()
 
 # Start thread to print current status and get user input.
 t = Thread(target=print_status,
-           name='status_printer', args=(scouts, cfg_get('initial_view'), jobs))
+           name='status_printer', args=(pgscout.Scout.scouts, cfg_get('initial_view'), jobs))
 t.daemon = True
 t.start()
 
