@@ -184,6 +184,14 @@ class Scout(POGOAccount):
         self.update_history()
         return self.parse_encounter_response(responses, job)
 
+    #Override Mr. Mime method to configure action delay in request
+    def req_encounter(self, encounter_id, spawn_point_id, latitude, longitude):
+        return self.perform_request(lambda req: req.encounter(
+            encounter_id=encounter_id,
+            spawn_point_id=spawn_point_id,
+            player_latitude=latitude,
+            player_longitude=longitude), action=cfg_get('encounter_action_delay', 2.25))
+
     def parse_encounter_response(self, responses, job):
         if not responses:
             return self.scout_error("Empty encounter response")

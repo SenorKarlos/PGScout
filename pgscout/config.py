@@ -77,6 +77,9 @@ def parse_args():
     parser.add_argument('-lpf', '--low-prio-file',
                         help='File with Pokemon names or IDs that will be treated with low priority or even dropped.')
 
+    parser.add_argument('-ead', '--encounter-action-delay', type=float, default=2.25,
+                        help='*DANGEROUS* Configure encounter action delay to before performing request. May cause faster bans/shadowbanning.  (Default 2.25)')
+
     accs = parser.add_mutually_exclusive_group(required=True)
     accs.add_argument('-pgpn', '--pgpool-num-accounts', type=int, default=0,
                       help='Use this many accounts from PGPool. --pgpool-url required.')
