@@ -134,8 +134,10 @@ def status(page=1):
     for i in range((page-1)*max_scouts_per_page, page*max_scouts_per_page):
         if i >= len(scouts):
             break
-        lines += "<tr>"
         s = scouts[i].acc
+        if not s:
+            continue
+        lines += "<tr>"
         warn = s.get_state('warn')
         warn_str = '' if warn is None else ('Yes' if warn else 'No')
         lines += td(i+1)
@@ -288,8 +290,14 @@ def load_accounts(jobs):
 
         if len(acc_json) > 0:
             log.info("Loaded {} accounts from PGPool.".format(len(acc_json)))
-            for acc in acc_json:
-                accounts.append(ScoutGuard(acc['auth_service'], acc['username'], acc['password'], jobs))
+
+        for i in range(0, cfg_get('pgpool_num_accounts')):
+            if i < len(acc_json):
+                accounts.append(ScoutGuard(acc_json[i]['auth_service'], acc_json[i]['username'], acc_json[i]['password'],
+                                           jobs))
+            else:
+                #We are using PGPool, load empty ScoutGuards that can be filled later
+                accounts.append(ScoutGuard(auth=None, username=None, password=None, job_queue=jobs))
 
     if len(accounts) == 0:
         log.error("Could not load any accounts. Nothing to do. Exiting.")

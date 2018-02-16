@@ -108,7 +108,7 @@ def print_status(scouts, initial_display, jobs):
 
         # Print lines
         os.system('cls' if os.name == 'nt' else 'clear')
-        print ('\n'.join(lines)).encode('utf-8')
+        print ('\n'.join(filter(None, lines))).encode('utf-8')  #Filter None lines from print
 
 
 def print_job_queue(lines, state, queue):
@@ -128,6 +128,13 @@ def print_job_queue(lines, state, queue):
 def print_scouts(lines, state, scouts):
     def scout_line(current_line, scout_guard):
         scout = scout_guard.acc
+        if not scout:                           #If no scout, skip by returning None, filtered out later
+            if cfg_get('proxies'):
+                return line_tmpl.format(current_line, "None", "", "", "", 'No', "", "", "", "",
+                                        "Waiting for new account...")
+            else:
+                return line_tmpl.format(current_line, "None", "", "", 'No', "", "", "", "",
+                                        "Waiting for new account...")
         warn = scout.get_state('warn')
         warn_str = '' if warn is None else ('Yes' if warn else 'No')
         active = 'Yes' if scout_guard.active else 'No'
@@ -150,7 +157,7 @@ def print_scouts(lines, state, scouts):
                                     scout.last_msg)
 
     len_username = str(reduce(lambda l1, l2: max(l1, l2),
-                              map(lambda s: len(s.acc.username), scouts)))
+                              map(lambda s: len(s.get_account_username()), scouts)))
     len_num = str(len(str(len(scouts))))
     if cfg_get('proxies'):
         len_proxies = str(reduce(lambda l1, l2: max(l1, l2),
