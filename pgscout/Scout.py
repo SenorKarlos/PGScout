@@ -34,7 +34,7 @@ ENCOUNTER_RESULTS = {
 
 
 class Scout(POGOAccount):
-    def __init__(self, auth, username, password, job_queue):
+    def __init__(self, auth, username, password, job_queue, duplicate):
         super(Scout, self).__init__(auth, username, password,
                                     hash_key_provider=cfg_get('hash_key_provider'),
                                     proxy_provider=cfg_get('proxy_provider'))
@@ -45,6 +45,7 @@ class Scout(POGOAccount):
         self.start_time = time.time()
         self.previous_encounter = None
         self.total_encounters = 0
+        self.duplicate = duplicate   # 0 = master account, 1 = duplicate account, 2 = release duplicate account from semaphore loop 
 
         # Collects the last few pauses between encounters to measure a "encounters per hour" value
         self.past_pauses = deque()
@@ -56,6 +57,8 @@ class Scout(POGOAccount):
     def run(self):
         self.log_info("Waiting for job...")
         while True:
+            if self.duplicate == 2:   # master account is banned so stop all duplicate accounts
+                break
             (prio, t, job) = self.job_queue.get()
             try:
                 if job.expired():

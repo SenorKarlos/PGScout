@@ -291,20 +291,22 @@ def load_accounts(jobs):
             for line in f:
                 fields = line.split(",")
                 fields = map(unicode.strip, fields)
-                accounts.append(ScoutGuard(fields[0], fields[1], fields[2], jobs))
+                accounts.append(ScoutGuard(fields[0], fields[1], fields[2], jobs, 0, 0))
     elif cfg_get('pgpool_url') and cfg_get('pgpool_system_id') and cfg_get('pgpool_num_accounts') > 0:
 
         acc_json = load_pgpool_accounts(cfg_get('pgpool_num_accounts'), reuse=True)
         if isinstance(acc_json, dict) and len(acc_json) > 0:
             acc_json = [acc_json]
 
+        log.info("Loaded {} accounts from PGPool.".format(len(acc_json)))
         for i in range(0, cfg_get('pgpool_num_accounts')):
             if i < len(acc_json):
-                accounts.append(ScoutGuard(acc_json[i]['auth_service'], acc_json[i]['username'], acc_json[i]['password'],
-                                           jobs))
+                for x in range(0,cfg_get('pgpool_acct_multiplier')):
+                    accounts.append(ScoutGuard(acc_json[i]['auth_service'], acc_json[i]['username'], acc_json[i]['password'], jobs, 0 if x==0 else 1, i if x==0 else x))
             else:
                 #We are using PGPool, load empty ScoutGuards that can be filled later
-                accounts.append(ScoutGuard(auth="", username="Waiting for account", password="", job_queue=jobs))
+                for x in range(0,cfg_get('pgpool_acct_multiplier')):
+                    accounts.append(ScoutGuard(auth="", username="Waiting for account", password="", job_queue=jobs, duplicate=0 if x==0 else 1, index=i if x==0 else x))
 
     if len(accounts) == 0:
         log.error("Could not load any accounts. Nothing to do. Exiting.")
@@ -324,7 +326,7 @@ cfg_init()
 
 scouts = load_accounts(jobs)
 for scout in scouts:
-    t = Thread(target=scout.run)
+    t = Thread(target=scout.run, args=(scouts))
     t.daemon = True
     t.start()
 
